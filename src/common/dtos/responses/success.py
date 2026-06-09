@@ -1,9 +1,9 @@
-from typing import Any, Dict, List, Optional, TypeVar
+from typing import Generic, Optional, TypeVar
 
 from fastapi import status
 from pydantic import BaseModel
 
-T = TypeVar("T", List[Any], Dict[str, Any], str, BaseModel)
+T = TypeVar("T")
 
 
 class Pagination(BaseModel):
@@ -12,7 +12,7 @@ class Pagination(BaseModel):
     total: int
 
 
-class SuccessResponse(BaseModel):
+class SuccessResponse(BaseModel, Generic[T]):
     status_code: int = status.HTTP_200_OK
     msg: str
     data: Optional[T] = None
