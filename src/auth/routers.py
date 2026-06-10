@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.auth.deps import get_current_user, oauth2_scheme
+from src.auth.deps import get_bearer_token, get_current_user
 from src.auth.dtos.requests.auth import (
     LogoutRequest,
     RefreshRequest,
@@ -74,7 +74,7 @@ async def refresh(req: RefreshRequest, db: DbSession) -> SuccessResponse:
 async def logout(
     req: LogoutRequest,
     db: DbSession,
-    access_token: Annotated[str, Depends(oauth2_scheme)],
+    access_token: Annotated[str, Depends(get_bearer_token)],
     _: Annotated[User, Depends(get_current_user)],
 ) -> SuccessResponse:
     await AuthService(db).logout(access_token, req.refresh_token)

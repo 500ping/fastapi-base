@@ -2,7 +2,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import status
-from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 
 from src.auth.constants import (
@@ -22,7 +21,6 @@ from src.common.exceptions.api_exception import APIException
 from src.common.services import BaseService
 
 settings = get_settings()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/signin")
 
 
 class AuthService(BaseService):

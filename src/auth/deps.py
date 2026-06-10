@@ -1,7 +1,7 @@
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import Depends, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pwdlib import PasswordHash
 from pwdlib.hashers.bcrypt import BcryptHasher
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,11 +22,26 @@ from src.common.exceptions.api_exception import APIException
 
 settings = get_settings()
 password_hash = PasswordHash((BcryptHasher(),))
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/signin")
+# auto_error=False so a missing/invalid header flows through our APIException
+# handler (401 + JSON envelope) instead of Starlette's default 403.
+bearer_scheme = HTTPBearer(auto_error=False)
+
+
+async def get_bearer_token(
+    credentials: Annotated[
+        Optional[HTTPAuthorizationCredentials], Depends(bearer_scheme)
+    ],
+) -> str:
+    """Extract the raw bearer token from the Authorization header."""
+    if credentials is None:
+        raise APIException(
+            status.HTTP_401_UNAUTHORIZED, ExceptionMessageEnum.INVALID_TOKEN
+        )
+    return credentials.credentials
 
 
 async def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
+    token: Annotated[str, Depends(get_bearer_token)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> User:
     """Resolve the authenticated user from a non-revoked access token."""
