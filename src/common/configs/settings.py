@@ -24,6 +24,8 @@ class Settings(BaseSettings):
 
     # Redis (used for distributed locks)
     redis_url: str = "redis://localhost:6379/0"
+    redis_connect_max_retries: int = 5
+    redis_connect_retry_delay: float = 2.0
     redis_lock_timeout: float = 10.0
     redis_lock_blocking_timeout: float = 10.0
 

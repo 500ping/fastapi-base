@@ -65,6 +65,7 @@ Settings come from environment variables / `.env` (see `.env.example`). Key ones
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `30`                                   | Access token lifetime.               |
 | `REFRESH_TOKEN_EXPIRE_DAYS`   | `7`                                    | Refresh token lifetime.              |
 | `DB_CONNECT_MAX_RETRIES`   | `5`                                       | Startup DB connection attempts.      |
+| `REDIS_CONNECT_MAX_RETRIES`| `5`                                       | Startup Redis connection attempts.   |
 
 ## Common commands
 

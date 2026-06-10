@@ -15,6 +15,7 @@ from src.common.handlers.exception_handler import (
     validation_exception_handler,
 )
 from src.common.middlewares.log_middleware import LoggingMiddleware
+from src.common.redis.client import check_redis_connection
 from src.common.routers import router as common_router
 from src.course.routers import router as course_router
 
@@ -28,6 +29,7 @@ logger = get_logger(__name__)
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     logger.info("Application startup")
     await check_database_connection()
+    await check_redis_connection()
     yield
     logger.info("Application shutdown")
 
