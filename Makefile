@@ -73,6 +73,19 @@ reset: ## Recreate the local stack (drops data volumes)
 logs: ## Tail the compose stack logs
 	$(COMPOSE) logs -f
 
+# ---- Dev stack (self-contained: db + redis + app + Loki + Promtail + Grafana)
+DEV := docker compose -f docker-compose.dev.yml
+
+.PHONY: dev
+dev: ## Start the full self-contained dev stack with log aggregation
+	$(DEV) up -d --build
+	@echo "Grafana:  http://localhost:3000  (Explore -> Loki)"
+	@echo "App:      http://localhost:8000/docs"
+
+.PHONY: dev-down
+dev-down: ## Stop the dev stack
+	$(DEV) down
+
 # ---- Migrations -----------------------------------------------------------
 .PHONY: migrate
 migrate: ## Apply all migrations (alembic upgrade head)

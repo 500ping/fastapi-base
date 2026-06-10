@@ -1,0 +1,14 @@
+apiVersion: 1
+
+providers:
+  - name: default
+    orgId: 1
+    type: file
+    disableDeletion: false
+    # The JSON files are the source of truth (mounted read-only); UI edits aren't
+    # written back. Change the dashboard by editing app-logs.json.
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

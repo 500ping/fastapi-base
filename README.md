@@ -18,6 +18,8 @@ building features instead of wiring boilerplate.
 - **Consistent API envelope** — `SuccessResponse[T]` and a single `APIException`
   flow with centralized error messages.
 - **Structured logging** — structlog JSON output with a per-request id.
+- **Log aggregation** (opt-in) — a Grafana + Loki + Promtail stack that scrapes
+  the containerized app's JSON logs (`make dev`).
 - **Startup DB health check** — retries with tenacity, aborts if the DB is down.
 - **Migrations** — Alembic (async) with autogenerate.
 - **Tests** — pytest + testcontainers (a throwaway Postgres and Redis per run).
@@ -72,6 +74,7 @@ Run `make help` for the full list.
 | -------------------------- | -------------------------------------------- |
 | `make run`                 | Run the app with autoreload.                 |
 | `make up` / `make down`    | Start / stop the local compose stack.        |
+| `make dev`                 | Start the full stack with log aggregation.   |
 | `make migrate`             | Apply all migrations.                        |
 | `make migration m="..."`   | Autogenerate a migration.                    |
 | `make test`                | Run the test suite (needs Docker).           |
@@ -126,6 +129,49 @@ make coverage-html   # writes htmlcov/index.html for a line-by-line view
 
 Coverage is scoped to `src/` with branch coverage enabled (configured under
 `[tool.coverage.*]` in `pyproject.toml`).
+
+## Log aggregation (Grafana Loki)
+
+The app logs structured JSON to stdout. For centralized, queryable logs there's an
+opt-in observability stack:
+
+```bash
+make dev            # builds + runs: app + Postgres + Redis + Loki + Promtail + Grafana
+```
+
+- **App** runs as a container (so its stdout can be scraped) at
+  <http://localhost:8000/docs>. Migrations run automatically on startup.
+- **Promtail** discovers containers via the Docker socket and pushes their stdout
+  to **Loki**. Only the `app`, `db` and `redis` containers are scraped. The
+  **app** emits JSON, so its low-cardinality fields (`level`, `logger`,
+  `compose_service`, `container`) become labels while `request_id`/`message` stay
+  in the line; `db`/`redis` are plain text and pass through untouched.
+- **Grafana** is at <http://localhost:3000> (anonymous admin, no login).
+  Everything is **pre-provisioned**, so there's nothing to set up each run:
+  - Loki is the default datasource.
+  - An **App Logs** dashboard (the home page) with a service/level filter, a
+    log-volume-by-level graph, error/total counters, and a live log panel.
+
+  To explore ad-hoc, open **Explore** and query with LogQL, e.g.:
+
+  ```logql
+  {compose_service="app"} | json | level="error"
+  {container="fastapi_base_app"} |= "request_id"
+  ```
+
+Stop it with `make dev-down`. The whole stack is self-contained in
+`docker-compose.dev.yml` (db + redis + app + Loki + Promtail + Grafana), so a dev
+deploy is a single `docker compose -f docker-compose.dev.yml up -d --build`.
+`docker-compose.local.yml` stays lightweight (db + redis only) for host dev with
+`make up` + `make run`. Config lives under `docker/` (Loki, Promtail, and Grafana
+datasource + dashboard provisioning) and the app image is built from the root
+`Dockerfile`. The Grafana dashboard JSON is the source of truth
+(`docker/grafana/dashboards/app-logs.json`); edit that file to change it — UI
+edits aren't persisted.
+
+> For plain host development (hot reload, no aggregation) keep using `make up` +
+> `make run`; those host logs are **not** captured by Promtail, which scrapes
+> Docker containers only.
 
 ## Project structure & conventions
 

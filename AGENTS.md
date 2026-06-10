@@ -227,6 +227,12 @@ This is a fully async app. The event loop must never block.
 - `logger = get_logger(__name__)`. Log with structured key-values, not f-strings:
   `logger.info("widget created", widget_id=widget.id)`. Output is JSON and the
   request id is attached automatically.
+- Keep keys low-cardinality where they matter as Loki labels (`level`, `logger`).
+  Per-entity values (ids, request_id) belong in the line, not as labels.
+- Logs go to **stdout** as JSON. The opt-in `make dev` stack (app + Loki +
+  Promtail + Grafana, configured under `docker/`) scrapes container stdout into
+  Loki; query in Grafana Explore with LogQL. See the README for details. Don't
+  add file logging or alternate sinks — keep stdout JSON as the single source.
 
 ## Testing
 

@@ -1,0 +1,54 @@
+# Promtail: discovers Docker containers via the Docker socket and ships their
+# stdout to Loki. Only the app, db and redis containers are scraped; the app's
+# JSON lines get parsed, db/redis stay as plain text.
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      # Only keep our app + its datastores; drop loki/promtail/grafana noise.
+      - source_labels: ["__meta_docker_container_label_com_docker_compose_service"]
+        regex: "app|db|redis"
+        action: keep
+      # /fastapi_base_app -> container="fastapi_base_app"
+      - source_labels: ["__meta_docker_container_name"]
+        regex: "/(.*)"
+        target_label: container
+      # The compose service name (app, db, redis) as a label.
+      - source_labels: ["__meta_docker_container_label_com_docker_compose_service"]
+        target_label: compose_service
+      # stdout vs stderr.
+      - source_labels: ["__meta_docker_container_log_stream"]
+        target_label: stream
+    pipeline_stages:
+      # Only the app emits structured JSON. Parse it for that service only:
+      # lift a few low-cardinality fields into labels and use the app's own
+      # timestamp. Keep high-cardinality values (request_id, message) in the
+      # line. db/redis logs are plain text and pass through untouched.
+      - match:
+          selector: '{compose_service="app"}'
+          stages:
+            - json:
+                expressions:
+                  level: level
+                  logger: logger
+                  timestamp: timestamp
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+                fallback_formats:
+                  - RFC3339
+            - labels:
+                level:
+                logger:
