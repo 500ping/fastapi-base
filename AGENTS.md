@@ -34,6 +34,7 @@ tests/<feature>/         # tests mirror the source tree
   `check_database_connection()` (startup retry).
 - `models.py` — `BaseModel`: the **single** declarative base (id/created_at/updated_at).
 - `services.py` — `BaseService` + `@BaseService.transaction`.
+- `dtos/requests/pagination.py` — `PaginationParams` (reusable `page`/`size` query base).
 - `dtos/responses/success.py` — `SuccessResponse[T]` (generic) and `Pagination`.
 - `enums/message_enum.py` — `ExceptionMessageEnum`: all user-facing error strings.
 - `exceptions/api_exception.py` — `APIException(http_status, message)`.
@@ -140,6 +141,34 @@ class WidgetService(BaseService):
   `response_model=SuccessResponse[T]` and `response_model_exclude_none=True`.
   `SuccessResponse` is generic — always parametrize it (`SuccessResponse[WidgetResponse]`),
   otherwise the nested `data` is dropped.
+
+### Pagination
+
+- For list endpoints, **reuse** `PaginationParams` from
+  `src/common/dtos/requests/pagination.py` — don't redeclare `page`/`size`. It
+  provides validated `page` (≥1) and `size` (1–`MAX_PAGE_SIZE`) fields plus
+  `offset`/`limit` helpers.
+- Add endpoint-specific (optional) filters by **subclassing** it, then accept the
+  subclass as query params with `Annotated[..., Query()]` (FastAPI flattens the
+  model into individual query params):
+
+  ```python
+  class ListWidgetsParams(PaginationParams):
+      status: Optional[WidgetStatus] = None
+
+  @router.get("", response_model=SuccessResponse[list[WidgetResponse]], ...)
+  async def list_widgets(
+      db: DbSession, params: Annotated[ListWidgetsParams, Query()]
+  ) -> SuccessResponse:
+      rows, total = await WidgetService(db).list_widgets(params.status, params.page, params.size)
+      return SuccessResponse(
+          data=[...],
+          pagination=Pagination(page=params.page, size=params.size, total=total),
+      )
+  ```
+
+- The service stays decoupled from the DTO: take plain `page`/`size` ints and
+  return `(rows, total)` so the route can build the `Pagination` envelope.
 
 ## Routers
 

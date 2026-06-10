@@ -95,8 +95,12 @@ user who enrolls. All routes require a valid access token and act on the
 authenticated user. They live under `/api/v1/courses`:
 
 1. `POST /classes` — the current user creates a class they own (teacher).
-2. `GET /classes/{id}` — class detail, including `capacity` and `enrolled_count`.
-3. `POST /classes/{id}/enroll` — the current user enrolls **themselves** as a student.
+2. `GET /classes` — list classes (paginated). Optional `relation` query param
+   scopes the result to the current user: `owner` (classes they teach), `joiner`
+   (classes they joined), or omitted for all classes. Supports `page` / `size`.
+3. `GET /classes/{id}` — class detail, including `capacity` and `enrolled_count`.
+4. `GET /classes/{id}/students` — list the students enrolled in a class.
+5. `POST /classes/{id}/enroll` — the current user enrolls **themselves** as a student.
 
 A class holds up to **40 students** (`MAX_STUDENTS_PER_CLASS`). The capacity check
 is a read-modify-write, so concurrent enrollments could otherwise race past the
