@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     db_connect_max_retries: int = 5
     db_connect_retry_delay: float = 2.0
 
+    # Redis (used for distributed locks)
+    redis_url: str = "redis://localhost:6379/0"
+    redis_lock_timeout: float = 10.0
+    redis_lock_blocking_timeout: float = 10.0
+
     # JWT
     jwt_secret_key: str = "change-me-to-a-secure-random-secret-key"
     jwt_algorithm: str = "HS256"

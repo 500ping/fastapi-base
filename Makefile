@@ -46,6 +46,15 @@ test: ## Run the test suite (requires Docker for testcontainers)
 test-v: ## Run the test suite verbosely
 	uv run pytest -v
 
+.PHONY: coverage
+coverage: ## Run tests with a coverage report (terminal)
+	uv run pytest --cov
+
+.PHONY: coverage-html
+coverage-html: ## Run tests and write an HTML coverage report to htmlcov/
+	uv run pytest --cov --cov-report=html
+	@echo "Open htmlcov/index.html"
+
 # ---- Compose stack --------------------------------------------------------
 .PHONY: up
 up: ## Start the local compose stack

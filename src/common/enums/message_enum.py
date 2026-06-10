@@ -11,3 +11,11 @@ class ExceptionMessageEnum(StrEnum):
     TOKEN_REVOKED = "Token has been revoked"
     USER_NOT_FOUND = "User not found"
     INACTIVE_USER = "Inactive user"
+
+    # Course
+    CLASS_NOT_FOUND = "Class not found"
+    CLASS_FULL = "Class has reached its maximum capacity"
+    ALREADY_ENROLLED = "Already enrolled in this class"
+
+    # Infrastructure
+    LOCK_UNAVAILABLE = "Service is busy, please try again"

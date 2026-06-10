@@ -10,6 +10,9 @@ building features instead of wiring boilerplate.
 - **Async everything** — FastAPI + SQLAlchemy 2 async + psycopg3.
 - **Auth module** (reference feature) — signup, signin, refresh, and logout with
   JWT access/refresh tokens and DB-backed token blacklisting.
+- **Course module** — teachers, students, and classes built on the `User` model,
+  with student self-enrollment guarded by a **Redis distributed lock** so a class
+  never exceeds its capacity, even under concurrent requests.
 - **Transactional services** — `BaseService.transaction` wraps a unit of work in
   one commit/rollback.
 - **Consistent API envelope** — `SuccessResponse[T]` and a single `APIException`
@@ -17,13 +20,13 @@ building features instead of wiring boilerplate.
 - **Structured logging** — structlog JSON output with a per-request id.
 - **Startup DB health check** — retries with tenacity, aborts if the DB is down.
 - **Migrations** — Alembic (async) with autogenerate.
-- **Tests** — pytest + testcontainers (a throwaway Postgres per run).
+- **Tests** — pytest + testcontainers (a throwaway Postgres and Redis per run).
 
 ## Requirements
 
 - Python **3.14+**
 - [uv](https://docs.astral.sh/uv/)
-- Docker (for the local database and the test suite)
+- Docker (for the local PostgreSQL + Redis stack and the test suite)
 
 ## Setup
 
@@ -34,7 +37,7 @@ make install            # uv sync
 # 2. Create your env file and adjust as needed
 cp .env.example .env
 
-# 3. Start the local stack (PostgreSQL)
+# 3. Start the local stack (PostgreSQL + Redis)
 make up
 
 # 4. Apply database migrations
@@ -55,6 +58,7 @@ Settings come from environment variables / `.env` (see `.env.example`). Key ones
 | -------------------------- | ----------------------------------------- | ------------------------------------ |
 | `DEBUG`                    | `1`                                       | Debug mode (verbose logs, SQL echo). |
 | `DATABASE_URL`             | `postgresql+psycopg://...localhost:5432/fastapi_base` | Async Postgres DSN.      |
+| `REDIS_URL`                | `redis://localhost:6379/0`                | Redis DSN (distributed locks).       |
 | `JWT_SECRET_KEY`           | placeholder                               | **Set a strong 32+ byte secret.**    |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `30`                                   | Access token lifetime.               |
 | `REFRESH_TOKEN_EXPIRE_DAYS`   | `7`                                    | Refresh token lifetime.              |
@@ -71,6 +75,7 @@ Run `make help` for the full list.
 | `make migrate`             | Apply all migrations.                        |
 | `make migration m="..."`   | Autogenerate a migration.                    |
 | `make test`                | Run the test suite (needs Docker).           |
+| `make coverage`            | Run tests with a coverage report.            |
 | `make lint` / `make format`| Lint / format with ruff.                     |
 
 ## Auth flow
@@ -82,14 +87,41 @@ All routes are under `/api/v1/auth`:
 3. `POST /refresh` — exchange a refresh token for a new pair.
 4. `POST /logout` — revoke the current access and refresh tokens (blacklisted).
 
+## Course module
+
+A small domain feature built on top of `User` — there is no separate role table:
+a **teacher** is simply whoever owns (created) a class, and a **student** is any
+user who enrolls. All routes require a valid access token and act on the
+authenticated user. They live under `/api/v1/courses`:
+
+1. `POST /classes` — the current user creates a class they own (teacher).
+2. `GET /classes/{id}` — class detail, including `capacity` and `enrolled_count`.
+3. `POST /classes/{id}/enroll` — the current user enrolls **themselves** as a student.
+
+A class holds up to **40 students** (`MAX_STUDENTS_PER_CLASS`). The capacity check
+is a read-modify-write, so concurrent enrollments could otherwise race past the
+limit. Enrollment therefore runs under a **Redis distributed lock** (see
+`src/common/redis/client.py`) that spans the count, the insert, and the commit —
+so the cap holds even across multiple app instances.
+
 ## Testing
 
 ```bash
 make test
 ```
 
-Tests spin up a disposable PostgreSQL container (Docker required); each test runs
-against a fresh schema. No local database is touched.
+Tests spin up disposable PostgreSQL and Redis containers (Docker required); each
+test runs against a fresh schema. No local database is touched.
+
+### Coverage
+
+```bash
+make coverage        # terminal report (shows missing lines)
+make coverage-html   # writes htmlcov/index.html for a line-by-line view
+```
+
+Coverage is scoped to `src/` with branch coverage enabled (configured under
+`[tool.coverage.*]` in `pyproject.toml`).
 
 ## Project structure & conventions
 

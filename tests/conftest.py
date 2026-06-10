@@ -4,6 +4,7 @@ from typing import AsyncIterator, Iterator
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -11,9 +12,11 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from testcontainers.postgres import PostgresContainer
+from testcontainers.redis import RedisContainer
 
 # Import models so their tables register on BaseModel.metadata.
 import src.auth.models  # noqa: F401
+import src.course.models  # noqa: F401
 from src.common.database.session import get_db
 from src.common.models import BaseModel
 
@@ -27,6 +30,36 @@ def postgres_url() -> Iterator[str]:
         # test database too.
         os.environ["DATABASE_URL"] = url
         yield url
+
+
+@pytest.fixture(scope="session")
+def redis_url() -> Iterator[str]:
+    """Start a throwaway Redis container for the whole test session."""
+    with RedisContainer("redis:7") as redis:
+        host = redis.get_container_host_ip()
+        port = redis.get_exposed_port(6379)
+        url = f"redis://{host}:{port}/0"
+        os.environ["REDIS_URL"] = url
+        yield url
+
+
+@pytest_asyncio.fixture
+async def redis_client(redis_url: str) -> AsyncIterator[Redis]:
+    """Point the app's Redis client at the test container, fresh per test.
+
+    Created inside the test's event loop so the async client binds to the right
+    loop, and the DB is flushed so leftover lock keys never bleed across tests.
+    """
+    import src.common.redis.client as redis_module
+
+    client = Redis.from_url(redis_url, decode_responses=True)
+    await client.flushdb()
+    redis_module._redis_client = client
+    try:
+        yield client
+    finally:
+        await client.aclose()
+        redis_module._redis_client = None
 
 
 @pytest_asyncio.fixture

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 # Import models so their tables register on BaseModel.metadata for autogenerate.
 import src.auth.models  # noqa: F401
+import src.course.models  # noqa: F401
 from src.common.configs.settings import get_settings
 from src.common.models import BaseModel
 

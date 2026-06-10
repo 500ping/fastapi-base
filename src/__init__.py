@@ -16,6 +16,7 @@ from src.common.handlers.exception_handler import (
 )
 from src.common.middlewares.log_middleware import LoggingMiddleware
 from src.common.routers import router as common_router
+from src.course.routers import router as course_router
 
 settings = get_settings()
 
@@ -52,6 +53,7 @@ def register_routers(app: FastAPI) -> None:
     base_router = APIRouter(prefix="/api/v1")
     base_router.include_router(common_router, tags=["Common"])
     base_router.include_router(auth_router, prefix="/auth", tags=["Auth"])
+    base_router.include_router(course_router, prefix="/courses", tags=["Course"])
     app.include_router(base_router)
 
 
