@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 
 class ClassResponse(BaseModel):
@@ -21,3 +21,13 @@ class EnrollmentResponse(BaseModel):
     class_id: int
     student_id: int
     created_at: datetime
+
+
+class StudentResponse(BaseModel):
+    """A student (user) enrolled in a class, with when they joined."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: EmailStr
+    enrolled_at: datetime

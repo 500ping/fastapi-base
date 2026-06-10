@@ -60,6 +60,43 @@ _CLASS_DATA_EXAMPLE = {
 }
 
 
+LIST_CLASSES_RESPONSES = {
+    status.HTTP_200_OK: _response(
+        "Classes retrieved successfully",
+        example={
+            "status_code": status.HTTP_200_OK,
+            "msg": "Classes retrieved successfully",
+            "data": [_CLASS_DATA_EXAMPLE],
+            "pagination": {"page": 1, "size": 20, "total": 1},
+        },
+    ),
+    status.HTTP_401_UNAUTHORIZED: UNAUTHORIZED_RESPONSE,
+}
+
+
+LIST_STUDENTS_RESPONSES = {
+    status.HTTP_200_OK: _response(
+        "Students retrieved successfully",
+        example={
+            "status_code": status.HTTP_200_OK,
+            "msg": "Students retrieved successfully",
+            "data": [
+                {
+                    "id": 1,
+                    "email": "alan@example.com",
+                    "enrolled_at": "2026-06-10T07:24:01.986311Z",
+                }
+            ],
+        },
+    ),
+    status.HTTP_401_UNAUTHORIZED: UNAUTHORIZED_RESPONSE,
+    status.HTTP_404_NOT_FOUND: _response(
+        "Class not found",
+        example=_error(status.HTTP_404_NOT_FOUND, ExceptionMessageEnum.CLASS_NOT_FOUND),
+    ),
+}
+
+
 CREATE_CLASS_RESPONSES = {
     status.HTTP_201_CREATED: _response(
         "Class created successfully",

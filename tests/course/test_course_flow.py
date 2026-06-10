@@ -128,3 +128,125 @@ async def test_get_missing_class_returns_404(client: AsyncClient) -> None:
     resp = await client.get(f"{CLASSES}/999", headers=user["headers"])
 
     assert resp.status_code == 404
+
+
+async def test_list_classes_returns_all(client: AsyncClient) -> None:
+    t1 = await _register(client, "t1@example.com")
+    t2 = await _register(client, "t2@example.com")
+    await _create_class(client, t1["headers"], name="A")
+    await _create_class(client, t1["headers"], name="B")
+    await _create_class(client, t2["headers"], name="C")
+
+    resp = await client.get(CLASSES, headers=t1["headers"])
+
+    assert resp.status_code == 200
+    assert len(resp.json()["data"]) == 3
+
+
+async def test_list_classes_requires_auth(client: AsyncClient) -> None:
+    resp = await client.get(CLASSES)
+
+    assert resp.status_code == 401
+
+
+async def test_list_classes_pagination(client: AsyncClient) -> None:
+    teacher = await _register(client, "teacher@example.com")
+    for name in ("A", "B", "C"):
+        await _create_class(client, teacher["headers"], name=name)
+
+    first = await client.get(
+        CLASSES, params={"page": 1, "size": 2}, headers=teacher["headers"]
+    )
+    body = first.json()
+    assert len(body["data"]) == 2
+    assert body["pagination"] == {"page": 1, "size": 2, "total": 3}
+
+    second = await client.get(
+        CLASSES, params={"page": 2, "size": 2}, headers=teacher["headers"]
+    )
+    body2 = second.json()
+    assert len(body2["data"]) == 1
+    assert body2["pagination"]["total"] == 3
+    # No overlap between pages.
+    assert {c["id"] for c in body["data"]}.isdisjoint(c["id"] for c in body2["data"])
+
+
+async def test_list_classes_invalid_pagination_returns_422(
+    client: AsyncClient,
+) -> None:
+    user = await _register(client, "user@example.com")
+
+    resp = await client.get(CLASSES, params={"size": 0}, headers=user["headers"])
+
+    assert resp.status_code == 422
+
+
+async def test_list_classes_relation_owner(client: AsyncClient) -> None:
+    t1 = await _register(client, "t1@example.com")
+    t2 = await _register(client, "t2@example.com")
+    await _create_class(client, t1["headers"], name="A")
+    await _create_class(client, t1["headers"], name="B")
+    await _create_class(client, t2["headers"], name="C")
+
+    # t1 sees only the classes they teach.
+    resp = await client.get(
+        CLASSES, params={"relation": "owner"}, headers=t1["headers"]
+    )
+
+    data = resp.json()["data"]
+    assert len(data) == 2
+    assert all(c["teacher_id"] == t1["id"] for c in data)
+
+
+async def test_list_classes_relation_joiner(client: AsyncClient, redis_client) -> None:
+    teacher = await _register(client, "teacher@example.com")
+    student = await _register(client, "student@example.com")
+    joined = await _create_class(client, teacher["headers"], name="Joined")
+    await _create_class(client, teacher["headers"], name="Other")
+    await client.post(f"{CLASSES}/{joined['id']}/enroll", headers=student["headers"])
+
+    # The student sees only the class they joined.
+    resp = await client.get(
+        CLASSES, params={"relation": "joiner"}, headers=student["headers"]
+    )
+
+    data = resp.json()["data"]
+    assert len(data) == 1
+    assert data[0]["id"] == joined["id"]
+    assert data[0]["enrolled_count"] == 1
+
+
+async def test_list_classes_invalid_relation_returns_422(client: AsyncClient) -> None:
+    user = await _register(client, "user@example.com")
+
+    resp = await client.get(
+        CLASSES, params={"relation": "nope"}, headers=user["headers"]
+    )
+
+    assert resp.status_code == 422
+
+
+async def test_list_students_in_class(client: AsyncClient, redis_client) -> None:
+    teacher = await _register(client, "teacher@example.com")
+    s1 = await _register(client, "s1@example.com")
+    s2 = await _register(client, "s2@example.com")
+    classroom = await _create_class(client, teacher["headers"])
+    await client.post(f"{CLASSES}/{classroom['id']}/enroll", headers=s1["headers"])
+    await client.post(f"{CLASSES}/{classroom['id']}/enroll", headers=s2["headers"])
+
+    resp = await client.get(
+        f"{CLASSES}/{classroom['id']}/students", headers=teacher["headers"]
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert sorted(s["email"] for s in data) == ["s1@example.com", "s2@example.com"]
+    assert all(s["enrolled_at"] for s in data)
+
+
+async def test_list_students_missing_class_returns_404(client: AsyncClient) -> None:
+    user = await _register(client, "user@example.com")
+
+    resp = await client.get(f"{CLASSES}/999/students", headers=user["headers"])
+
+    assert resp.status_code == 404

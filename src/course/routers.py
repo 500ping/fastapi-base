@@ -1,20 +1,26 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.deps import get_current_user
 from src.auth.models import User
 from src.common.database.session import get_db
-from src.common.dtos.responses.success import SuccessResponse
+from src.common.dtos.responses.success import Pagination, SuccessResponse
 from src.course.constants import MAX_STUDENTS_PER_CLASS
-from src.course.dtos.requests.course import CreateClassRequest
-from src.course.dtos.responses.course import ClassResponse, EnrollmentResponse
+from src.course.dtos.requests.course import CreateClassRequest, ListClassesParams
+from src.course.dtos.responses.course import (
+    ClassResponse,
+    EnrollmentResponse,
+    StudentResponse,
+)
 from src.course.models import ClassRoom
 from src.course.openapi import (
     CREATE_CLASS_RESPONSES,
     ENROLL_RESPONSES,
     GET_CLASS_RESPONSES,
+    LIST_CLASSES_RESPONSES,
+    LIST_STUDENTS_RESPONSES,
 )
 from src.course.services import CourseService
 
@@ -54,6 +60,27 @@ async def create_class(
 
 
 @router.get(
+    "/classes",
+    response_model=SuccessResponse[list[ClassResponse]],
+    response_model_exclude_none=True,
+    responses=LIST_CLASSES_RESPONSES,
+)
+async def list_classes(
+    db: DbSession,
+    user: CurrentUser,
+    params: Annotated[ListClassesParams, Query()],
+) -> SuccessResponse:
+    rows, total = await CourseService(db).list_classes(
+        user.id, params.relation, params.page, params.size
+    )
+    return SuccessResponse(
+        msg="Classes retrieved successfully",
+        data=[_class_response(classroom, count) for classroom, count in rows],
+        pagination=Pagination(page=params.page, size=params.size, total=total),
+    )
+
+
+@router.get(
     "/classes/{class_id}",
     response_model=SuccessResponse[ClassResponse],
     response_model_exclude_none=True,
@@ -66,6 +93,25 @@ async def get_class(class_id: int, db: DbSession, _: CurrentUser) -> SuccessResp
     return SuccessResponse(
         msg="Class retrieved successfully",
         data=_class_response(classroom, enrolled_count),
+    )
+
+
+@router.get(
+    "/classes/{class_id}/students",
+    response_model=SuccessResponse[list[StudentResponse]],
+    response_model_exclude_none=True,
+    responses=LIST_STUDENTS_RESPONSES,
+)
+async def list_students(
+    class_id: int, db: DbSession, _: CurrentUser
+) -> SuccessResponse:
+    rows = await CourseService(db).list_students(class_id)
+    return SuccessResponse(
+        msg="Students retrieved successfully",
+        data=[
+            StudentResponse(id=user.id, email=user.email, enrolled_at=enrolled_at)
+            for user, enrolled_at in rows
+        ],
     )
 
 
