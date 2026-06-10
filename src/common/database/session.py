@@ -19,8 +19,20 @@ from src.common.configs.settings import get_settings
 settings = get_settings()
 logger = get_logger(__name__)
 
-engine = create_async_engine(settings.database_url, echo=settings.debug)
-AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+# Force every connection's session timezone to UTC so timestamps are stored and
+# read back in UTC (naive datetimes written to timestamptz columns and func.now()
+# are interpreted as UTC, never the server's local timezone).
+engine = create_async_engine(
+    settings.database_url,
+    echo=settings.debug,
+    pool_size=10,
+    max_overflow=20,
+    pool_recycle=1800,
+    connect_args={"options": "-c timezone=utc"},
+)
+AsyncSessionLocal = async_sessionmaker(
+    engine, autocommit=False, autoflush=False, expire_on_commit=False
+)
 
 
 async def get_db() -> AsyncIterator[AsyncSession]:

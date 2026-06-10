@@ -65,7 +65,9 @@ async def redis_client(redis_url: str) -> AsyncIterator[Redis]:
 @pytest_asyncio.fixture
 async def db_engine(postgres_url: str) -> AsyncIterator[AsyncEngine]:
     """Engine bound to the test container, with a fresh schema per test."""
-    engine = create_async_engine(postgres_url)
+    engine = create_async_engine(
+        postgres_url, connect_args={"options": "-c timezone=utc"}
+    )
     async with engine.begin() as conn:
         await conn.run_sync(BaseModel.metadata.create_all)
     try:
